@@ -84,7 +84,7 @@ Set the default options for FastMM here.
 {Enable this option to suppress the generation of debug info for the
  FastMM4.pas unit. This will prevent the integrated debugger from stepping into
  the memory manager code.}
-{.$define NoDebugInfo}
+{$define NoDebugInfo}
 
 {Enable this option to suppress the display of all message dialogs. This is
  useful in service applications that should not be interrupted.}
@@ -338,15 +338,15 @@ Set the default options for FastMM here.
 {Group the options you use for release and debug versions below}
 {$ifdef Release}
   {Specify the options you use for release versions below}
-  {.$undef FullDebugMode}
+  {$undef FullDebugMode}
   {.$undef CheckHeapForCorruption}
   {.$define ASMVersion}
   {.$undef EnableMemoryLeakReporting}
   {.$undef UseOutputDebugString}
 {$else}
   {Specify the options you use for debugging below}
-  {.$define FullDebugMode}
-  {.$define EnableMemoryLeakReporting}
+  {$define FullDebugMode}
+  {$define EnableMemoryLeakReporting}
   {.$define UseOutputDebugString}
 {$endif}
 
