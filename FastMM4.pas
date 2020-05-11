@@ -58,33 +58,20 @@ License:
  License 2.1 (LGPL 2.1, available from
  http://www.opensource.org/licenses/lgpl-license.php). If you find FastMM useful
  or you would like to support further development, a donation would be much
- appreciated. My banking details are:
-   Country: South Africa
-   Bank: ABSA Bank Ltd
-   Branch: Somerset West
-   Branch Code: 334-712
-   Account Name: PSD (Distribution)
-   Account No.: 4041827693
-   Swift Code: ABSAZAJJ
+ appreciated.
  My PayPal account is:
-   bof@psd.co.za
+   paypal@leriche.org
 
 Contact Details:
  My contact details are shown below if you would like to get in touch with me.
  If you use this memory manager I would like to hear from you: please e-mail me
  your comments - good and bad.
- Snailmail:
-   PO Box 2514
-   Somerset West
-   7129
-   South Africa
  E-mail:
-   plr@psd.co.za
+   fastmm@leriche.org
 
 Support:
  If you have trouble using FastMM, you are welcome to drop me an e-mail at the
- address above, or you may post your questions in the BASM newsgroup on the
- Embarcadero news server (which is where I hang out quite frequently).
+ address above.
 
 Disclaimer:
  FastMM has been tested extensively with both single and multithreaded
@@ -1247,6 +1234,16 @@ type
   {The callback procedure for WalkAllocatedBlocks.}
   TWalkAllocatedBlocksCallback = procedure(APBlock: Pointer; ABlockSize: NativeInt; AUserData: Pointer);
 
+  TFastMM_MemoryManagerInstallationState = (
+    {The default memory manager is currently in use.}
+    mmisDefaultMemoryManagerInUse,
+    {Another third party memory manager has been installed.}
+    mmisOtherThirdPartyMemoryManagerInstalled,
+    {A shared memory manager is being used.}
+    mmisUsingSharedMemoryManager,
+    {This memory manager has been installed.}
+    mmisInstalled);
+
 {--------------------------Public variables----------------------------}
 var
   {If this variable is set to true and FullDebugMode is enabled, then the
@@ -1388,12 +1385,14 @@ function FastGetHeapStatus: THeapStatus;
 {Returns statistics about the current state of the memory manager}
 procedure GetMemoryManagerState(var AMemoryManagerState: TMemoryManagerState);
 {Returns a summary of the information returned by GetMemoryManagerState}
-procedure GetMemoryManagerUsageSummary(
-  var AMemoryManagerUsageSummary: TMemoryManagerUsageSummary);
+function GetMemoryManagerUsageSummary: TMemoryManagerUsageSummary; overload;
+procedure GetMemoryManagerUsageSummary(var AMemoryManagerUsageSummary: TMemoryManagerUsageSummary); overload;
 {$ifndef POSIX}
 {Gets the state of every 64K block in the 4GB address space}
 procedure GetMemoryMap(var AMemoryMap: TMemoryMap);
 {$endif}
+{Returns the current installation state of the memory manager.}
+function FastMM_GetInstallationState: TFastMM_MemoryManagerInstallationState;
 
 {$ifdef EnableMemoryLeakReporting}
 {Registers expected memory leaks. Returns true on success. The list of leaked
@@ -11804,8 +11803,7 @@ begin
 end;
 
 {Returns a summary of the information returned by GetMemoryManagerState}
-procedure GetMemoryManagerUsageSummary(
-  var AMemoryManagerUsageSummary: TMemoryManagerUsageSummary);
+function GetMemoryManagerUsageSummary: TMemoryManagerUsageSummary;
 var
   LMMS: TMemoryManagerState;
   LAllocatedBytes, LReservedBytes: NativeUInt;
@@ -11814,10 +11812,8 @@ begin
   {Get the memory manager state}
   GetMemoryManagerState(LMMS);
   {Add up the totals}
-  LAllocatedBytes := LMMS.TotalAllocatedMediumBlockSize
-    + LMMS.TotalAllocatedLargeBlockSize;
-  LReservedBytes := LMMS.ReservedMediumBlockAddressSpace
-    + LMMS.ReservedLargeBlockAddressSpace;
+  LAllocatedBytes := LMMS.TotalAllocatedMediumBlockSize + LMMS.TotalAllocatedLargeBlockSize;
+  LReservedBytes := LMMS.ReservedMediumBlockAddressSpace + LMMS.ReservedLargeBlockAddressSpace;
   for LSBTIndex := 0 to NumSmallBlockTypes - 1 do
   begin
     Inc(LAllocatedBytes, LMMS.SmallBlockTypeStates[LSBTIndex].UseableBlockSize
@@ -11825,15 +11821,17 @@ begin
     Inc(LReservedBytes, LMMS.SmallBlockTypeStates[LSBTIndex].ReservedAddressSpace);
   end;
   {Set the structure values}
-  AMemoryManagerUsageSummary.AllocatedBytes := LAllocatedBytes;
-  AMemoryManagerUsageSummary.OverheadBytes := LReservedBytes - LAllocatedBytes;
+  Result.AllocatedBytes := LAllocatedBytes;
+  Result.OverheadBytes := LReservedBytes - LAllocatedBytes;
   if LReservedBytes > 0 then
-  begin
-    AMemoryManagerUsageSummary.EfficiencyPercentage :=
-      LAllocatedBytes / LReservedBytes * 100;
-  end
+    Result.EfficiencyPercentage := LAllocatedBytes / LReservedBytes * 100
   else
-    AMemoryManagerUsageSummary.EfficiencyPercentage := 100;
+    Result.EfficiencyPercentage := 100;
+end;
+
+procedure GetMemoryManagerUsageSummary(var AMemoryManagerUsageSummary: TMemoryManagerUsageSummary);
+begin
+  AMemoryManagerUsageSummary := GetMemoryManagerUsageSummary;
 end;
 
 {$ifndef POSIX}
@@ -12097,6 +12095,25 @@ begin
   {There are no large blocks allocated}
   LargeBlocksCircularList.PreviousLargeBlockHeader := @LargeBlocksCircularList;
   LargeBlocksCircularList.NextLargeBlockHeader := @LargeBlocksCircularList;
+end;
+
+{Returns the current installation state of the memory manager.}
+function FastMM_GetInstallationState: TFastMM_MemoryManagerInstallationState;
+begin
+  if IsMemoryManagerSet then
+  begin
+    if FastMMIsInstalled then
+    begin
+      if IsMemoryManagerOwner then
+        Result := mmisInstalled
+      else
+        Result := mmisUsingSharedMemoryManager;
+    end
+    else
+      Result := mmisOtherThirdPartyMemoryManagerInstalled
+  end
+  else
+    Result := mmisDefaultMemoryManagerInUse;
 end;
 
 {$ifdef LogLockContention}
