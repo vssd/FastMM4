@@ -352,7 +352,7 @@ Set the default options for FastMM here.
   {.$undef UseOutputDebugString}
 {$else}
   {Specify the options you use for debugging below}
-  {$define FullDebugMode}
+  {$define FullDebugModeWhenDLLAvailable}
   {$define EnableMemoryLeakReporting}
   {.$define UseOutputDebugString}
 {$endif}
